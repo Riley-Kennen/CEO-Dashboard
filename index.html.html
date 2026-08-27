@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field Log — Broker Directory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #1B2430;
+    --surface: #232D3B;
+    --surface-raised: #2A3444;
+    --hairline: #38424F;
+    --ink: #EDE6D6;
+    --ink-muted: #8B94A3;
+    --accent: #C9862A;
+    --accent-soft: rgba(201,134,42,0.14);
+    --good: #4C9A6A;
+    --bad: #B4544A;
+    --claim-yellow: #E8B93F;
+    --claim-red: #C0463D;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app{ min-height:100vh; display:flex; flex-direction:column; }
+
+  /* ---------- shared ---------- */
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color: var(--accent);
+  }
+  h1,h2,h3{ font-family:'Fraunces', serif; margin:0; }
+  button{ font-family:inherit; cursor:pointer; }
+  .stamp{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    color: var(--ink-muted);
+    letter-spacing:0.03em;
+  }
+  .back-btn{
+    background:none; border:1px solid var(--hairline); color:var(--ink);
+    padding:8px 14px; border-radius:6px; font-size:13px; display:inline-flex;
+    align-items:center; gap:6px; transition: border-color .15s, color .15s;
+  }
+  .back-btn:hover{ border-color: var(--accent); color: var(--accent); }
+  .back-btn:focus-visible, button:focus-visible, select:focus-visible, li[tabindex]:focus-visible{
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+
+  /* ---------- HOME VIEW ---------- */
+  #view-home{
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding: 48px 24px; text-align:center; gap:40px;
+  }
+  .home-heading .eyebrow{ display:block; margin-bottom:10px; }
+  .home-heading h1{ font-size: clamp(28px, 5vw, 44px); font-weight:600; color:var(--ink); }
+  .home-heading p{ color:var(--ink-muted); margin-top:10px; font-size:15px; }
+
+  .big-btn{
+    background: linear-gradient(180deg, var(--surface-raised), var(--surface));
+    border: 1px solid var(--hairline);
+    border-top: 2px solid var(--accent);
+    color: var(--ink);
+    padding: 34px 64px;
+    border-radius: 10px;
+    font-size: 26px;
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    letter-spacing: 0.01em;
+    box-shadow: 0 18px 40px -20px rgba(0,0,0,0.6);
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    max-width: 520px;
+    width: 100%;
+  }
+  .big-btn:hover{ transform: translateY(-2px); box-shadow: 0 22px 48px -18px rgba(0,0,0,0.7); border-color: var(--accent); }
+  .big-btn .sub{
+    display:block; font-family:'IBM Plex Mono', monospace; font-size:11px;
+    letter-spacing:0.12em; text-transform:uppercase; color: var(--ink-muted); margin-top:8px; font-weight:400;
+  }
+
+  .small-buttons{ display:flex; gap:16px; flex-wrap:wrap; justify-content:center; }
+  .small-btn{
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    color: var(--ink);
+    padding: 16px 22px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight:500;
+    min-width: 160px;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .small-btn:hover{ border-color: var(--accent); background: var(--surface-raised); }
+
+  /* ---------- LIST VIEW ---------- */
+  #view-list{ flex:1; display:none; flex-direction:column; max-width: 860px; margin: 0 auto; width:100%; padding: 32px 24px 64px; }
+  .list-header{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom: 28px; flex-wrap:wrap; }
+  .list-header h2{ font-size: 30px; }
+  .sort-wrap{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+  .sort-wrap label{ font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:var(--ink-muted); font-family:'IBM Plex Mono', monospace; }
+  select{
+    background: var(--surface); color: var(--ink); border:1px solid var(--hairline);
+    padding: 9px 12px; border-radius:6px; font-size:13px; min-width:230px;
+  }
+
+  .status-line{ color: var(--ink-muted); font-size:13px; margin-bottom:18px; font-family:'IBM Plex Mono', monospace; }
+  .status-line.error{ color: var(--bad); }
+
+  /* ---------- FILTER PANEL ---------- */
+  .filter-toggle{
+    background: var(--surface); border:1px solid var(--hairline); color:var(--ink);
+    padding: 9px 14px; border-radius:6px; font-size:13px; display:inline-flex; align-items:center; gap:8px;
+    transition: border-color .15s ease;
+  }
+  .filter-toggle:hover{ border-color: var(--accent); }
+  .filter-toggle .badge{
+    background: var(--accent); color:#1B2430; font-family:'IBM Plex Mono', monospace; font-size:11px;
+    font-weight:600; border-radius: 10px; padding: 1px 7px; display:none;
+  }
+  .filter-toggle.active .badge{ display:inline-block; }
+  .filter-panel{
+    display:none; background: var(--surface); border:1px solid var(--hairline); border-top:2px solid var(--accent);
+    border-radius:8px; padding: 20px 22px; margin-bottom:22px; gap: 24px; flex-wrap:wrap;
+  }
+  .filter-panel.open{ display:flex; }
+  .filter-group{ min-width: 170px; }
+  .filter-group h4{
+    font-family:'IBM Plex Mono', monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.09em;
+    color: var(--ink-muted); margin: 0 0 10px 0; font-weight:500;
+  }
+  .filter-check{ display:flex; align-items:center; gap:8px; margin-bottom:9px; font-size:13.5px; cursor:pointer; }
+  .filter-check input{ accent-color: var(--accent); width:15px; height:15px; cursor:pointer; }
+  .filter-actions{ display:flex; align-items:flex-end; }
+  .filter-clear{
+    background:none; border:1px solid var(--hairline); color:var(--ink-muted); padding: 7px 12px;
+    border-radius:6px; font-size:12px; transition: border-color .15s ease, color .15s ease;
+  }
+  .filter-clear:hover{ border-color: var(--bad); color: var(--bad); }
+
+  ul.broker-list{ list-style:none; margin:0; padding:0; border-top:1px solid var(--hairline); }
+  .broker-row{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding: 18px 6px; border-bottom:1px solid var(--hairline);
+    cursor:pointer; transition: background .12s ease, padding-left .12s ease;
+  }
+  .broker-row:hover{ background: var(--accent-soft); padding-left: 14px; }
+  .broker-row .name{ font-family:'Fraunces', serif; font-size:18px; font-weight:600; }
+  .broker-row .name .id-tag{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--accent);
+    font-weight:400; margin-right:10px;
+  }
+  .broker-row .visited{ text-align:right; flex-shrink:0; }
+  .broker-row .visited .label{ display:block; font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-muted); font-family:'IBM Plex Mono', monospace; }
+  .broker-row .visited .date{ font-family:'IBM Plex Mono', monospace; font-size:13px; color:var(--ink); }
+
+  /* ---------- DETAIL VIEW ---------- */
+  #view-detail{ flex:1; display:none; flex-direction:column; max-width: 780px; margin:0 auto; width:100%; padding: 32px 24px 72px; }
+  .detail-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; }
+  .detail-title{ margin-bottom:34px; }
+  .detail-title .eyebrow{ margin-bottom:8px; }
+  .detail-title h2{ font-size:32px; }
+
+  .field-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 0; border-top:1px solid var(--hairline); }
+  .field{ padding: 16px 4px; border-bottom:1px solid var(--hairline); }
+  .field.full{ grid-column: 1 / -1; }
+  .field .k{ font-family:'IBM Plex Mono', monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.09em; color:var(--ink-muted); margin-bottom:6px; }
+  .field .v{ font-size:15px; line-height:1.45; }
+  .v.yes{ color: var(--good); font-weight:600; }
+  .v.no{ color: var(--bad); font-weight:600; }
+  .v.empty{ color: var(--ink-muted); font-style:italic; }
+
+  .notes-section{ margin-top:32px; }
+  .notes-section .k{ font-family:'IBM Plex Mono', monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:var(--accent); margin-bottom:12px; }
+  .notes-box{
+    background: var(--surface); border:1px solid var(--hairline); border-left:3px solid var(--accent);
+    border-radius: 4px; padding: 18px 20px; white-space:pre-line; line-height:1.6; font-size:14.5px;
+  }
+  .notes-box.empty{ color: var(--ink-muted); font-style:italic; white-space:normal; }
+
+  @media (max-width: 560px){
+    .field-grid{ grid-template-columns: 1fr; }
+    .big-btn{ padding: 26px 36px; font-size:22px; }
+  }
+
+  /* ---------- COMPETITOR HEAT MAP ---------- */
+  #view-competitors{ flex:1; display:none; flex-direction:column; max-width: 980px; margin:0 auto; width:100%; padding: 32px 24px 72px; }
+  .heatmap-header{ margin-bottom:22px; }
+  .heatmap-header h2{ font-size:30px; margin-top:14px; }
+  .heatmap-header p{ color:var(--ink-muted); font-size:13px; margin-top:8px; }
+  .heatmap-scroll{ overflow-x:auto; border:1px solid var(--hairline); border-radius:8px; }
+  table.heatmap{ border-collapse:collapse; width:100%; min-width:720px; font-size:13px; }
+  table.heatmap thead th{
+    font-family:'IBM Plex Mono', monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em;
+    color: var(--ink-muted); background: var(--surface-raised); padding: 12px 10px; text-align:center;
+    border-bottom:1px solid var(--hairline); border-left:1px solid var(--hairline); white-space:nowrap;
+  }
+  table.heatmap thead th:first-child{ text-align:left; border-left:none; }
+  table.heatmap thead th.other-head{ cursor: help; border-bottom: 2px dotted var(--accent); }
+  table.heatmap tbody td{
+    padding: 10px; border-bottom:1px solid var(--hairline); border-left:1px solid var(--hairline); text-align:center;
+  }
+  table.heatmap tbody td:first-child{ text-align:left; border-left:none; }
+  table.heatmap tbody tr:hover{ background: rgba(255,255,255,0.02); }
+  .heatmap-name{ font-family:'Fraunces', serif; font-weight:600; font-size:14px; white-space:nowrap; }
+  .heatmap-name .id-tag{ font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--accent); font-weight:400; margin-right:8px; }
+  .heat-cell{
+    display:inline-block; width:20px; height:20px; border-radius:4px; background: var(--hairline); opacity:0.35;
+  }
+  .heat-cell.hit{ background: var(--accent); opacity:1; }
+  td.other-cell{ cursor: help; }
+
+  /* ---------- BROKER VOLUME CHART ---------- */
+  #view-volume{ flex:1; display:none; flex-direction:column; max-width: 1040px; margin:0 auto; width:100%; padding: 32px 24px 72px; }
+  .volume-header{ margin-bottom:10px; }
+  .volume-header h2{ font-size:30px; margin-top:14px; }
+  .volume-header p{ color:var(--ink-muted); font-size:13px; margin-top:8px; }
+
+  .legend{ display:flex; gap:22px; margin: 18px 0 26px; flex-wrap:wrap; }
+  .legend-item{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-muted); }
+  .legend-swatch{ width:14px; height:14px; border-radius:3px; display:inline-block; }
+  .legend-swatch.yellow{ background: var(--claim-yellow); }
+  .legend-swatch.red{ background: var(--claim-red); }
+
+  .chart-wrap{ display:flex; gap:0; }
+  .y-axis{ display:flex; flex-direction:column; justify-content:space-between; height: 300px; padding-right:10px; text-align:right; }
+  .y-axis span{ font-family:'IBM Plex Mono', monospace; font-size:11px; color:var(--ink-muted); }
+  .chart-scroll{ overflow-x:auto; flex:1; border-left:1px solid var(--hairline); border-bottom:1px solid var(--hairline); }
+  .chart-area{ display:flex; align-items:flex-end; gap:16px; height:300px; padding: 0 16px; min-width: max-content; }
+  .bar-col{ display:flex; flex-direction:column; align-items:center; width:44px; flex-shrink:0; height:100%; justify-content:flex-end; }
+  .bar-stack{ width:28px; display:flex; flex-direction:column; border-radius:3px 3px 0 0; overflow:hidden; }
+  .bar-segment.red{ background: var(--claim-red); cursor:help; }
+  .bar-segment.yellow{ background: var(--claim-yellow); cursor:help; }
+  .bar-label{
+    margin-top:8px; font-size:10.5px; color:var(--ink-muted); white-space:nowrap;
+    transform: rotate(-42deg); transform-origin: top right; width: 14px; cursor:default;
+  }
+
+  /* ---------- REFERRALS CHART ---------- */
+  #view-referrals{ flex:1; display:none; flex-direction:column; max-width: 1040px; margin:0 auto; width:100%; padding: 32px 24px 72px; }
+  .referrals-header{ margin-bottom:26px; }
+  .referrals-header h2{ font-size:30px; margin-top:14px; }
+  .referrals-header p{ color:var(--ink-muted); font-size:13px; margin-top:8px; }
+  .bar-segment.single{ background: var(--accent); cursor:help; border-radius:3px 3px 0 0; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HOME -->
+  <div id="view-home">
+    <div class="home-heading">
+      <span class="eyebrow">Field Log</span>
+      <h1>Broker Relations</h1>
+      <p>Live directory, synced from the tracking sheet</p>
+    </div>
+
+    <button class="big-btn" onclick="showList()">
+      Broker List
+      <span class="sub">All locations · sortable</span>
+    </button>
+
+    <div class="small-buttons">
+      <button class="small-btn" onclick="showCompetitors()">Competitors</button>
+      <button class="small-btn" onclick="showVolume()">Broker Volume</button>
+      <button class="small-btn" onclick="showReferrals()">Referrals</button>
+    </div>
+  </div>
+
+  <!-- LIST -->
+  <div id="view-list">
+    <div class="list-header">
+      <div>
+        <button class="back-btn" onclick="showHome()">&larr; Home</button>
+        <h2 style="margin-top:14px;">Broker List</h2>
+      </div>
+      <div class="sort-wrap">
+        <label for="sort-select">Sort by</label>
+        <select id="sort-select" onchange="applySort()">
+          <option value="id-asc">Document ID — lowest to highest</option>
+          <option value="recent-desc">Most recently visited first</option>
+          <option value="firstvisit-desc">Newest contact first</option>
+        </select>
+        <button class="filter-toggle" id="filter-toggle-btn" onclick="toggleFilterPanel()" style="margin-top:8px;">
+          Filter <span class="badge" id="filter-badge">0</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="filter-panel" id="filter-panel">
+      <div class="filter-group">
+        <h4>Language (exact match)</h4>
+        <label class="filter-check"><input type="checkbox" class="filter-lang" value="cantonese" onchange="applySort()"> Cantonese</label>
+        <label class="filter-check"><input type="checkbox" class="filter-lang" value="mandarin" onchange="applySort()"> Mandarin</label>
+        <label class="filter-check"><input type="checkbox" class="filter-lang" value="english" onchange="applySort()"> English</label>
+      </div>
+      <div class="filter-group">
+        <h4>Meetings</h4>
+        <label class="filter-check"><input type="checkbox" id="filter-angus" onchange="applySort()"> Met with Angus</label>
+        <label class="filter-check"><input type="checkbox" id="filter-kennen" onchange="applySort()"> Confirmed to refer Kennen</label>
+      </div>
+      <div class="filter-group">
+        <h4>Competitors</h4>
+        <label class="filter-check"><input type="checkbox" id="filter-nocompetitors" onchange="applySort()"> No competitors</label>
+      </div>
+      <div class="filter-group filter-actions">
+        <button class="filter-clear" onclick="clearFilters()">Clear filters</button>
+      </div>
+    </div>
+    <div id="list-status" class="status-line">Loading brokers…</div>
+    <ul class="broker-list" id="broker-list"></ul>
+    <p style="color:var(--ink-muted); font-size:12px; margin-top:28px; line-height:1.6;">
+      Tip: if the list won't load, this page works most reliably when hosted online (e.g. GitHub Pages, Netlify) rather than opened straight from a downloaded file — some browsers block the live sheet request from local files.
+    </p>
+  </div>
+
+  <!-- COMPETITOR HEAT MAP -->
+  <div id="view-competitors">
+    <div class="heatmap-header">
+      <button class="back-btn" onclick="showHome()">&larr; Home</button>
+      <h2>Competitor Heat Map</h2>
+      <p>Brokers ordered by Document ID, lowest to highest. Filled cells mark which competitor(s) that broker deals with. Hover "Other" for the actual names behind it.</p>
+    </div>
+    <div class="heatmap-scroll">
+      <table class="heatmap" id="heatmap-table">
+        <thead>
+          <tr>
+            <th>Broker</th>
+            <th>Canstar</th>
+            <th>ServPro</th>
+            <th>ServiceMaster</th>
+            <th>Platinum Pro</th>
+            <th>Incredible</th>
+            <th class="other-head" id="other-head">Other</th>
+          </tr>
+        </thead>
+        <tbody id="heatmap-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- BROKER VOLUME CHART -->
+  <div id="view-volume">
+    <div class="volume-header">
+      <button class="back-btn" onclick="showHome()">&larr; Home</button>
+      <h2>Broker Volume</h2>
+      <p>Average flood/water claims per year per broker. The top portion of each bar shows what share of that broker's projects are commercial.</p>
+    </div>
+    <div class="legend">
+      <div class="legend-item"><span class="legend-swatch yellow"></span> Avg. flood/water claims per year</div>
+      <div class="legend-item"><span class="legend-swatch red"></span> % of commercial projects</div>
+    </div>
+    <div class="chart-wrap">
+      <div class="y-axis" id="volume-y-axis"></div>
+      <div class="chart-scroll">
+        <div class="chart-area" id="volume-chart-area"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REFERRALS CHART -->
+  <div id="view-referrals">
+    <div class="referrals-header">
+      <button class="back-btn" onclick="showHome()">&larr; Home</button>
+      <h2># of Referrals</h2>
+      <p>Number of referrals per broker. Hover a bar for the exact count.</p>
+    </div>
+    <div class="chart-wrap">
+      <div class="y-axis" id="referrals-y-axis"></div>
+      <div class="chart-scroll">
+        <div class="chart-area" id="referrals-chart-area"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DETAIL -->
+  <div id="view-detail">
+    <div class="detail-top">
+      <button class="back-btn" onclick="showList()">&larr; Broker List</button>
+    </div>
+    <div id="detail-content"></div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script>
+  const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSlZbTYws-WfdIFhXJ7jA5vO0qODP8VKAol5odAY7fBCyQKntaEwiltd9uYOHar6OADevBnD-EMxLAF/pub?gid=1418177186&single=true&output=csv";
+
+  let brokers = [];
+  let currentSort = "id-asc";
+
+  const COLS = {
+    broker: "Broker:",
+    docId: "Document ID:",
+    languages: "Languages:",
+    contacts: "Contacts:",
+    firstVisit: "First visit:",
+    recentVisit: "Most recent visit:",
+    floodCases: "Avg flood & water cases per yr:",
+    competitors: "Competitors:",
+    brochures: "Brochures:",
+    carriers: "Insurance Carriers:",
+    commercialPct: "% of Commercial Projects:",
+    angusMeeting: "Angus meeting? (yes/no)",
+    verbalConfirmation: "Verbal confirmation? (yes/no)",
+    notes: "Important notes:"
+  };
+
+  const KNOWN_COMPETITORS = ["Canstar", "ServPro", "ServiceMaster", "Platinum Pro", "Incredible"];
+
+  const ALL_VIEWS = ['view-home', 'view-list', 'view-competitors', 'view-volume', 'view-referrals', 'view-detail'];
+
+  function hideAllViews(){
+    ALL_VIEWS.forEach(id => { document.getElementById(id).style.display = 'none'; });
+  }
+
+  function showHome(){
+    hideAllViews();
+    document.getElementById('view-home').style.display = 'flex';
+  }
+
+  function showList(){
+    hideAllViews();
+    document.getElementById('view-list').style.display = 'flex';
+    if(brokers.length === 0){
+      loadBrokers();
+    }
+  }
+
+  function showCompetitors(){
+    hideAllViews();
+    document.getElementById('view-competitors').style.display = 'flex';
+    if(brokers.length === 0){
+      loadBrokers(renderCompetitorHeatmap);
+    } else {
+      renderCompetitorHeatmap();
+    }
+  }
+
+  function showVolume(){
+    hideAllViews();
+    document.getElementById('view-volume').style.display = 'flex';
+    if(brokers.length === 0){
+      loadBrokers(renderVolumeChart);
+    } else {
+      renderVolumeChart();
+    }
+  }
+
+  function showReferrals(){
+    hideAllViews();
+    document.getElementById('view-referrals').style.display = 'flex';
+    if(brokers.length === 0){
+      loadBrokers(renderReferralsChart);
+    } else {
+      renderReferralsChart();
+    }
+  }
+
+  function showDetail(index){
+    hideAllViews();
+    document.getElementById('view-detail').style.display = 'flex';
+    renderDetail(brokers[index]);
+    window.scrollTo(0,0);
+  }
+
+  function fetchText(url){
+    return fetch(url, { cache: "no-store" }).then(res => {
+      if(!res.ok) throw new Error("responded with " + res.status);
+      return res.text();
+    });
+  }
+
+  function loadBrokers(onDone){
+    const statusEl = document.getElementById('list-status');
+    const inListView = document.getElementById('view-list').style.display !== 'none';
+    if(inListView){
+      statusEl.textContent = "Loading brokers…";
+      statusEl.classList.remove('error');
+    }
+
+    // Try a direct fetch first. If the page is opened as a local file (or the
+    // browser otherwise blocks the cross-origin request), fall back to a
+    // CORS proxy that re-serves the same CSV with open access headers.
+    fetchText(CSV_URL)
+      .catch(() => fetchText("https://api.allorigins.win/raw?url=" + encodeURIComponent(CSV_URL)))
+      .then(csvText => {
+        const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+        brokers = parsed.data.filter(row => (row[COLS.broker] || "").trim() !== "");
+        if(inListView){
+          statusEl.textContent = brokers.length + " broker" + (brokers.length === 1 ? "" : "s") + " · updated live from the sheet";
+        }
+        if(onDone) onDone(); else applySort();
+      })
+      .catch(err => {
+        if(inListView){
+          statusEl.textContent = "Couldn't load the sheet (" + err.message + "). If you're opening this file directly from your computer, try hosting it online instead — see the note below the button.";
+          statusEl.classList.add('error');
+        } else {
+          alert("Couldn't load the sheet: " + err.message);
+        }
+      });
+  }
+
+  function parseDate(str){
+    if(!str) return null;
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function parseLanguages(raw){
+    if(!raw) return [];
+    return raw.split(/[,/&]|(?:\band\b)/i)
+      .map(s => s.trim().toLowerCase())
+      .filter(s => s.length > 0);
+  }
+
+  function brokerLanguageSet(row){
+    const langs = parseLanguages(row[COLS.languages]);
+    const set = new Set();
+    ['cantonese', 'mandarin', 'english'].forEach(key => {
+      if(langs.some(l => l.includes(key))) set.add(key);
+    });
+    return set;
+  }
+
+  function hasNoCompetitors(raw){
+    if(!raw) return true;
+    const v = raw.trim().toLowerCase();
+    return v === '' || v === 'n/a' || v === 'na' || v === 'none' || v === 'no' || v === '-' || v === 'nil';
+  }
+
+  function isYes(raw){
+    return (raw || '').trim().toLowerCase() === 'yes';
+  }
+
+  function splitCompetitors(raw){
+    if(!raw) return [];
+    return raw.split(/[,/&]|(?:\band\b)/i)
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+  }
+
+  function classifyCompetitors(raw){
+    // Returns { hits: Set of known competitor names matched, others: [raw token strings not matched] }
+    const result = { hits: new Set(), others: [] };
+    if(hasNoCompetitors(raw)) return result;
+    const tokens = splitCompetitors(raw);
+    tokens.forEach(token => {
+      const lower = token.toLowerCase();
+      const match = KNOWN_COMPETITORS.find(name => lower.includes(name.toLowerCase()) || name.toLowerCase().includes(lower));
+      if(match){
+        result.hits.add(match);
+      } else {
+        result.others.push(token);
+      }
+    });
+    return result;
+  }
+
+  function renderCompetitorHeatmap(){
+    const sorted = [...brokers].sort((a,b) => {
+      const idA = parseFloat(a[COLS.docId]); const idB = parseFloat(b[COLS.docId]);
+      if(isNaN(idA)) return 1; if(isNaN(idB)) return -1;
+      return idA - idB;
+    });
+
+    const allOtherNames = new Set();
+    const tbody = document.getElementById('heatmap-body');
+    tbody.innerHTML = '';
+
+    sorted.forEach(row => {
+      const raw = row[COLS.competitors];
+      const { hits, others } = classifyCompetitors(raw);
+      others.forEach(o => allOtherNames.add(o));
+
+      const docId = (row[COLS.docId] || '').trim();
+      const name = (row[COLS.broker] || '').trim();
+
+      const tr = document.createElement('tr');
+      const otherTitle = others.length ? others.join(', ') : '';
+
+      tr.innerHTML = `
+        <td><div class="heatmap-name"><span class="id-tag">(${docId || '—'})</span>${name}</div></td>
+        ${KNOWN_COMPETITORS.map(c => `<td><span class="heat-cell${hits.has(c) ? ' hit' : ''}"></span></td>`).join('')}
+        <td class="other-cell" ${otherTitle ? `title="${otherTitle.replace(/"/g,'&quot;')}"` : ''}>
+          <span class="heat-cell${others.length ? ' hit' : ''}"></span>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    const headEl = document.getElementById('other-head');
+    headEl.title = allOtherNames.size
+      ? 'Names found in column H not in the known list: ' + Array.from(allOtherNames).sort().join(', ')
+      : 'No unmatched competitor names found';
+  }
+
+  function parseNumber(raw){
+    if(!raw) return NaN;
+    const cleaned = raw.toString().replace(/[^0-9.\-]/g, '');
+    return cleaned === '' ? NaN : parseFloat(cleaned);
+  }
+
+  function escAttr(str){
+    return String(str).replace(/"/g, '&quot;');
+  }
+
+  function renderVolumeChart(){
+    const sorted = [...brokers].sort((a,b) => {
+      const idA = parseFloat(a[COLS.docId]); const idB = parseFloat(b[COLS.docId]);
+      if(isNaN(idA)) return 1; if(isNaN(idB)) return -1;
+      return idA - idB;
+    });
+
+    const data = sorted.map(row => {
+      const claims = parseNumber(row[COLS.floodCases]);
+      const pct = parseNumber(row[COLS.commercialPct]);
+      return {
+        name: (row[COLS.broker] || '').trim(),
+        docId: (row[COLS.docId] || '').trim(),
+        claims: isNaN(claims) ? 0 : claims,
+        pct: isNaN(pct) ? 0 : Math.min(Math.max(pct, 0), 100)
+      };
+    });
+
+    const maxClaims = Math.max(1, ...data.map(d => d.claims));
+    const chartMaxPx = 280;
+
+    const chartArea = document.getElementById('volume-chart-area');
+    chartArea.innerHTML = data.map(d => {
+      const totalPx = Math.round((d.claims / maxClaims) * chartMaxPx);
+      const redPx = Math.round(totalPx * (d.pct / 100));
+      const yellowPx = Math.max(totalPx - redPx, 0);
+      const label = escAttr(`(${d.docId || '—'}) ${d.name}`);
+      return `
+        <div class="bar-col">
+          <div class="bar-stack" style="height:${totalPx}px;">
+            <div class="bar-segment yellow" style="height:${yellowPx}px" title="${label}: ${d.claims} avg flood/water claims per year"></div>
+            <div class="bar-segment red" style="height:${redPx}px" title="${label}: ${d.pct}% of projects are commercial"></div>
+          </div>
+          <div class="bar-label" title="${label}">${d.name}</div>
+        </div>
+      `;
+    }).join('');
+
+    const yAxis = document.getElementById('volume-y-axis');
+    const steps = 4;
+    let axisHtml = '';
+    for(let i = steps; i >= 0; i--){
+      const value = Math.round((maxClaims * i) / steps);
+      axisHtml += `<span>${value}</span>`;
+    }
+    yAxis.innerHTML = axisHtml;
+  }
+
+  function getColumnN(row){
+    // Reads column N (14th column, index 13) by position, not by header
+    // name, so this keeps working whatever you title that column.
+    return Object.values(row)[13];
+  }
+
+  function renderReferralsChart(){
+    const sorted = [...brokers].sort((a,b) => {
+      const idA = parseFloat(a[COLS.docId]); const idB = parseFloat(b[COLS.docId]);
+      if(isNaN(idA)) return 1; if(isNaN(idB)) return -1;
+      return idA - idB;
+    });
+
+    const data = sorted.map(row => {
+      const count = parseNumber(getColumnN(row));
+      return {
+        name: (row[COLS.broker] || '').trim(),
+        docId: (row[COLS.docId] || '').trim(),
+        count: isNaN(count) ? 0 : count
+      };
+    });
+
+    const maxCount = Math.max(1, ...data.map(d => d.count));
+    const chartMaxPx = 280;
+
+    const chartArea = document.getElementById('referrals-chart-area');
+    chartArea.innerHTML = data.map(d => {
+      const totalPx = Math.round((d.count / maxCount) * chartMaxPx);
+      const label = escAttr(`(${d.docId || '—'}) ${d.name}`);
+      return `
+        <div class="bar-col">
+          <div class="bar-stack" style="height:${totalPx}px;">
+            <div class="bar-segment single" style="height:${totalPx}px" title="${label}: ${d.count} referral${d.count === 1 ? '' : 's'}"></div>
+          </div>
+          <div class="bar-label" title="${label}">${d.name}</div>
+        </div>
+      `;
+    }).join('');
+
+    const yAxis = document.getElementById('referrals-y-axis');
+    const steps = 4;
+    let axisHtml = '';
+    for(let i = steps; i >= 0; i--){
+      const value = Math.round((maxCount * i) / steps);
+      axisHtml += `<span>${value}</span>`;
+    }
+    yAxis.innerHTML = axisHtml;
+  }
+
+  function toggleFilterPanel(){
+    document.getElementById('filter-panel').classList.toggle('open');
+  }
+
+  function clearFilters(){
+    document.querySelectorAll('.filter-lang').forEach(cb => cb.checked = false);
+    document.getElementById('filter-angus').checked = false;
+    document.getElementById('filter-kennen').checked = false;
+    document.getElementById('filter-nocompetitors').checked = false;
+    applySort();
+  }
+
+  function getActiveFilterCount(){
+    let count = document.querySelectorAll('.filter-lang:checked').length;
+    if(document.getElementById('filter-angus').checked) count++;
+    if(document.getElementById('filter-kennen').checked) count++;
+    if(document.getElementById('filter-nocompetitors').checked) count++;
+    return count;
+  }
+
+  function filterBrokers(list){
+    const checkedLangs = Array.from(document.querySelectorAll('.filter-lang:checked')).map(cb => cb.value);
+    const requireAngus = document.getElementById('filter-angus').checked;
+    const requireKennen = document.getElementById('filter-kennen').checked;
+    const requireNoCompetitors = document.getElementById('filter-nocompetitors').checked;
+
+    return list.filter(row => {
+      if(checkedLangs.length > 0){
+        const spoken = brokerLanguageSet(row);
+        const checkedSet = new Set(checkedLangs);
+        if(spoken.size !== checkedSet.size) return false;
+        for(const lang of checkedSet){ if(!spoken.has(lang)) return false; }
+      }
+      if(requireAngus && !isYes(row[COLS.angusMeeting])) return false;
+      if(requireKennen && !isYes(row[COLS.verbalConfirmation])) return false;
+      if(requireNoCompetitors && !hasNoCompetitors(row[COLS.competitors])) return false;
+      return true;
+    });
+  }
+
+  function applySort(){
+    currentSort = document.getElementById('sort-select').value;
+
+    const activeCount = getActiveFilterCount();
+    const badge = document.getElementById('filter-badge');
+    const toggleBtn = document.getElementById('filter-toggle-btn');
+    badge.textContent = activeCount;
+    toggleBtn.classList.toggle('active', activeCount > 0);
+
+    const filtered = filterBrokers(brokers);
+    const sorted = [...filtered];
+
+    if(currentSort === "id-asc"){
+      sorted.sort((a,b) => {
+        const idA = parseFloat(a[COLS.docId]); const idB = parseFloat(b[COLS.docId]);
+        if(isNaN(idA)) return 1; if(isNaN(idB)) return -1;
+        return idA - idB;
+      });
+    } else if(currentSort === "recent-desc"){
+      sorted.sort((a,b) => {
+        const dA = parseDate(a[COLS.recentVisit]); const dB = parseDate(b[COLS.recentVisit]);
+        if(!dA) return 1; if(!dB) return -1;
+        return dB - dA;
+      });
+    } else if(currentSort === "firstvisit-desc"){
+      sorted.sort((a,b) => {
+        const dA = parseDate(a[COLS.firstVisit]); const dB = parseDate(b[COLS.firstVisit]);
+        if(!dA) return 1; if(!dB) return -1;
+        return dB - dA;
+      });
+    }
+
+    const statusEl = document.getElementById('list-status');
+    if(!statusEl.classList.contains('error') && brokers.length > 0){
+      statusEl.textContent = activeCount > 0
+        ? sorted.length + " of " + brokers.length + " brokers match your filters"
+        : brokers.length + " broker" + (brokers.length === 1 ? "" : "s") + " · updated live from the sheet";
+    }
+
+    renderList(sorted);
+  }
+
+  function renderList(list){
+    const ul = document.getElementById('broker-list');
+    ul.innerHTML = "";
+    list.forEach(row => {
+      const originalIndex = brokers.indexOf(row);
+      const li = document.createElement('li');
+      li.className = 'broker-row';
+      li.tabIndex = 0;
+      li.onclick = () => showDetail(originalIndex);
+      li.onkeydown = (e) => { if(e.key === 'Enter') showDetail(originalIndex); };
+
+      const docId = (row[COLS.docId] || "").trim();
+      const name = (row[COLS.broker] || "").trim();
+      const recentVisit = (row[COLS.recentVisit] || "").trim();
+
+      li.innerHTML = `
+        <div class="name"><span class="id-tag">(${docId || "—"})</span>${name}</div>
+        <div class="visited">
+          <span class="label">Last visited</span>
+          <span class="date">${recentVisit || "—"}</span>
+        </div>
+      `;
+      ul.appendChild(li);
+    });
+  }
+
+  function fieldRow(label, value, opts){
+    opts = opts || {};
+    const isEmpty = !value || value.trim() === "";
+    let cls = "v";
+    let display = value;
+    if(isEmpty){ cls += " empty"; display = "Not recorded"; }
+    else if(opts.yesNo){
+      const v = value.trim().toLowerCase();
+      if(v === "yes") cls += " yes";
+      else if(v === "no") cls += " no";
+    }
+    return `<div class="field${opts.full ? ' full' : ''}">
+      <div class="k">${label}</div>
+      <div class="${cls}">${display}</div>
+    </div>`;
+  }
+
+  function renderDetail(row){
+    const docId = (row[COLS.docId] || "").trim();
+    const notes = (row[COLS.notes] || "").trim();
+
+    const html = `
+      <div class="detail-title">
+        <span class="eyebrow">Doc ${docId || "—"}</span>
+        <h2>${name}</h2>
+      </div>
+      <div class="field-grid">
+        ${fieldRow("Languages", row[COLS.languages])}
+        ${fieldRow("Contacts", row[COLS.contacts])}
+        ${fieldRow("First visit", row[COLS.firstVisit])}
+        ${fieldRow("Most recent visit", row[COLS.recentVisit])}
+        ${fieldRow("Avg flood &amp; water cases / yr", row[COLS.floodCases])}
+        ${fieldRow("% of commercial projects", row[COLS.commercialPct])}
+        ${fieldRow("Competitors", row[COLS.competitors])}
+        ${fieldRow("Brochures", row[COLS.brochures])}
+        ${fieldRow("Insurance carriers", row[COLS.carriers], {full:true})}
+        ${fieldRow("Angus meeting?", row[COLS.angusMeeting], {yesNo:true})}
+        ${fieldRow("Verbal confirmation?", row[COLS.verbalConfirmation], {yesNo:true})}
+      </div>
+      <div class="notes-section">
+        <div class="k">Important notes</div>
+        <div class="notes-box${notes ? '' : ' empty'}">${notes || "No notes recorded for this broker."}</div>
+      </div>
+    `;
+    document.getElementById('detail-content').innerHTML = html;
+  }
+</script>
+</body>
+</html>
