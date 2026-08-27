@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field Log — Broker Directory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #1B2430;
+    --surface: #232D3B;
+    --surface-raised: #2A3444;
+    --hairline: #38424F;
+    --ink: #EDE6D6;
+    --ink-muted: #8B94A3;
+    --accent: #C9862A;
+    --accent-soft: rgba(201,134,42,0.14);
+    --good: #4C9A6A;
+    --bad: #B4544A;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app{ min-height:100vh; display:flex; flex-direction:column; }
+
+  /* ---------- shared ---------- */
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color: var(--accent);
+  }
+  h1,h2,h3{ font-family:'Fraunces', serif; margin:0; }
+  button{ font-family:inherit; cursor:pointer; }
+  .stamp{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    color: var(--ink-muted);
+    letter-spacing:0.03em;
+  }
+  .back-btn{
+    background:none; border:1px solid var(--hairline); color:var(--ink);
+    padding:8px 14px; border-radius:6px; font-size:13px; display:inline-flex;
+    align-items:center; gap:6px; transition: border-color .15s, color .15s;
+  }
+  .back-btn:hover{ border-color: var(--accent); color: var(--accent); }
+  .back-btn:focus-visible, button:focus-visible, select:focus-visible, li[tabindex]:focus-visible{
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+
+  /* ---------- HOME VIEW ---------- */
+  #view-home{
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding: 48px 24px; text-align:center; gap:40px;
+  }
+  .home-heading .eyebrow{ display:block; margin-bottom:10px; }
+  .home-heading h1{ font-size: clamp(28px, 5vw, 44px); font-weight:600; color:var(--ink); }
+  .home-heading p{ color:var(--ink-muted); margin-top:10px; font-size:15px; }
+
+  .big-btn{
+    background: linear-gradient(180deg, var(--surface-raised), var(--surface));
+    border: 1px solid var(--hairline);
+    border-top: 2px solid var(--accent);
+    color: var(--ink);
+    padding: 34px 64px;
+    border-radius: 10px;
+    font-size: 26px;
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    letter-spacing: 0.01em;
+    box-shadow: 0 18px 40px -20px rgba(0,0,0,0.6);
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    max-width: 520px;
+    width: 100%;
+  }
+  .big-btn:hover{ transform: translateY(-2px); box-shadow: 0 22px 48px -18px rgba(0,0,0,0.7); border-color: var(--accent); }
+  .big-btn .sub{
+    display:block; font-family:'IBM Plex Mono', monospace; font-size:11px;
+    letter-spacing:0.12em; text-transform:uppercase; color: var(--ink-muted); margin-top:8px; font-weight:400;
+  }
+
+  .small-buttons{ display:flex; gap:16px; flex-wrap:wrap; justify-content:center; }
+  .small-btn{
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    color: var(--ink);
+    padding: 16px 22px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight:500;
+    min-width: 160px;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .small-btn:hover{ border-color: var(--accent); background: var(--surface-raised); }
+
+  /* ---------- LIST VIEW ---------- */
+  #view-list{ flex:1; display:none; flex-direction:column; max-width: 860px; margin: 0 auto; width:100%; padding: 32px 24px 64px; }
+  .list-header{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom: 28px; flex-wrap:wrap; }
+  .list-header h2{ font-size: 30px; }
+  .sort-wrap{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+  .sort-wrap label{ font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:var(--ink-muted); font-family:'IBM Plex Mono', monospace; }
+  select{
+    background: var(--surface); color: var(--ink); border:1px solid var(--hairline);
+    padding: 9px 12px; border-radius:6px; font-size:13px; min-width:230px;
+  }
+
+  .status-line{ color: var(--ink-muted); font-size:13px; margin-bottom:18px; font-family:'IBM Plex Mono', monospace; }
+  .status-line.error{ color: var(--bad); }
+
+  ul.broker-list{ list-style:none; margin:0; padding:0; border-top:1px solid var(--hairline); }
+  .broker-row{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding: 18px 6px; border-bottom:1px solid var(--hairline);
+    cursor:pointer; transition: background .12s ease, padding-left .12s ease;
+  }
+  .broker-row:hover{ background: var(--accent-soft); padding-left: 14px; }
+  .broker-row .name{ font-family:'Fraunces', serif; font-size:18px; font-weight:600; }
+  .broker-row .name .id-tag{
+    font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--accent);
+    font-weight:400; margin-right:10px;
+  }
+  .broker-row .visited{ text-align:right; flex-shrink:0; }
+  .broker-row .visited .label{ display:block; font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink-muted); font-family:'IBM Plex Mono', monospace; }
+  .broker-row .visited .date{ font-family:'IBM Plex Mono', monospace; font-size:13px; color:var(--ink); }
+
+  /* ---------- DETAIL VIEW ---------- */
+  #view-detail{ flex:1; display:none; flex-direction:column; max-width: 780px; margin:0 auto; width:100%; padding: 32px 24px 72px; }
+  .detail-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; }
+  .detail-title{ margin-bottom:34px; }
+  .detail-title .eyebrow{ margin-bottom:8px; }
+  .detail-title h2{ font-size:32px; }
+
+  .field-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 0; border-top:1px solid var(--hairline); }
+  .field{ padding: 16px 4px; border-bottom:1px solid var(--hairline); }
+  .field.full{ grid-column: 1 / -1; }
+  .field .k{ font-family:'IBM Plex Mono', monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:0.09em; color:var(--ink-muted); margin-bottom:6px; }
+  .field .v{ font-size:15px; line-height:1.45; }
+  .v.yes{ color: var(--good); font-weight:600; }
+  .v.no{ color: var(--bad); font-weight:600; }
+  .v.empty{ color: var(--ink-muted); font-style:italic; }
+
+  .notes-section{ margin-top:32px; }
+  .notes-section .k{ font-family:'IBM Plex Mono', monospace; font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:var(--accent); margin-bottom:12px; }
+  .notes-box{
+    background: var(--surface); border:1px solid var(--hairline); border-left:3px solid var(--accent);
+    border-radius: 4px; padding: 18px 20px; white-space:pre-line; line-height:1.6; font-size:14.5px;
+  }
+  .notes-box.empty{ color: var(--ink-muted); font-style:italic; white-space:normal; }
+
+  @media (max-width: 560px){
+    .field-grid{ grid-template-columns: 1fr; }
+    .big-btn{ padding: 26px 36px; font-size:22px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HOME -->
+  <div id="view-home">
+    <div class="home-heading">
+      <span class="eyebrow">Field Log</span>
+      <h1>Broker Relations</h1>
+      <p>Live directory, synced from the tracking sheet</p>
+    </div>
+
+    <button class="big-btn" onclick="showList()">
+      Broker List
+      <span class="sub">All locations · sortable</span>
+    </button>
+
+    <div class="small-buttons">
+      <button class="small-btn" onclick="alert('Not set up yet — tell Claude what this should link to.')">Languages</button>
+      <button class="small-btn" onclick="alert('Not set up yet — tell Claude what this should link to.')">Met with Angus</button>
+      <button class="small-btn" onclick="alert('Not set up yet — tell Claude what this should link to.')">Confirmed to refer Kennen</button>
+    </div>
+  </div>
+
+  <!-- LIST -->
+  <div id="view-list">
+    <div class="list-header">
+      <div>
+        <button class="back-btn" onclick="showHome()">&larr; Home</button>
+        <h2 style="margin-top:14px;">Broker List</h2>
+      </div>
+      <div class="sort-wrap">
+        <label for="sort-select">Sort by</label>
+        <select id="sort-select" onchange="applySort()">
+          <option value="id-asc">Document ID — lowest to highest</option>
+          <option value="recent-desc">Most recently visited first</option>
+          <option value="firstvisit-desc">Newest contact first</option>
+        </select>
+      </div>
+    </div>
+    <div id="list-status" class="status-line">Loading brokers…</div>
+    <ul class="broker-list" id="broker-list"></ul>
+    <p style="color:var(--ink-muted); font-size:12px; margin-top:28px; line-height:1.6;">
+      Tip: if the list won't load, this page works most reliably when hosted online (e.g. GitHub Pages, Netlify) rather than opened straight from a downloaded file — some browsers block the live sheet request from local files.
+    </p>
+  </div>
+
+  <!-- DETAIL -->
+  <div id="view-detail">
+    <div class="detail-top">
+      <button class="back-btn" onclick="showList()">&larr; Broker List</button>
+    </div>
+    <div id="detail-content"></div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script>
+  const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSlZbTYws-WfdIFhXJ7jA5vO0qODP8VKAol5odAY7fBCyQKntaEwiltd9uYOHar6OADevBnD-EMxLAF/pub?gid=1418177186&single=true&output=csv";
+
+  let brokers = [];
+  let currentSort = "id-asc";
+
+  const COLS = {
+    broker: "Broker:",
+    docId: "Document ID:",
+    languages: "Languages:",
+    contacts: "Contacts:",
+    firstVisit: "First visit:",
+    recentVisit: "Most recent visit:",
+    floodCases: "Avg flood & water cases per yr:",
+    competitors: "Competitors:",
+    brochures: "Brochures:",
+    carriers: "Insurance Carriers:",
+    commercialPct: "% of Commercial Projects:",
+    angusMeeting: "Angus meeting? (yes/no)",
+    verbalConfirmation: "Verbal confirmation? (yes/no)",
+    notes: "Important notes:"
+  };
+
+  function showHome(){
+    document.getElementById('view-home').style.display = 'flex';
+    document.getElementById('view-list').style.display = 'none';
+    document.getElementById('view-detail').style.display = 'none';
+  }
+
+  function showList(){
+    document.getElementById('view-home').style.display = 'none';
+    document.getElementById('view-list').style.display = 'flex';
+    document.getElementById('view-detail').style.display = 'none';
+    if(brokers.length === 0){
+      loadBrokers();
+    }
+  }
+
+  function showDetail(index){
+    document.getElementById('view-home').style.display = 'none';
+    document.getElementById('view-list').style.display = 'none';
+    document.getElementById('view-detail').style.display = 'flex';
+    renderDetail(brokers[index]);
+    window.scrollTo(0,0);
+  }
+
+  function fetchText(url){
+    return fetch(url, { cache: "no-store" }).then(res => {
+      if(!res.ok) throw new Error("responded with " + res.status);
+      return res.text();
+    });
+  }
+
+  function loadBrokers(){
+    const statusEl = document.getElementById('list-status');
+    statusEl.textContent = "Loading brokers…";
+    statusEl.classList.remove('error');
+
+    // Try a direct fetch first. If the page is opened as a local file (or the
+    // browser otherwise blocks the cross-origin request), fall back to a
+    // CORS proxy that re-serves the same CSV with open access headers.
+    fetchText(CSV_URL)
+      .catch(() => fetchText("https://api.allorigins.win/raw?url=" + encodeURIComponent(CSV_URL)))
+      .then(csvText => {
+        const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+        brokers = parsed.data.filter(row => (row[COLS.broker] || "").trim() !== "");
+        statusEl.textContent = brokers.length + " broker" + (brokers.length === 1 ? "" : "s") + " · updated live from the sheet";
+        applySort();
+      })
+      .catch(err => {
+        statusEl.textContent = "Couldn't load the sheet (" + err.message + "). If you're opening this file directly from your computer, try hosting it online instead — see the note below the button.";
+        statusEl.classList.add('error');
+      });
+  }
+
+  function parseDate(str){
+    if(!str) return null;
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function applySort(){
+    currentSort = document.getElementById('sort-select').value;
+    const sorted = [...brokers];
+
+    if(currentSort === "id-asc"){
+      sorted.sort((a,b) => {
+        const idA = parseFloat(a[COLS.docId]); const idB = parseFloat(b[COLS.docId]);
+        if(isNaN(idA)) return 1; if(isNaN(idB)) return -1;
+        return idA - idB;
+      });
+    } else if(currentSort === "recent-desc"){
+      sorted.sort((a,b) => {
+        const dA = parseDate(a[COLS.recentVisit]); const dB = parseDate(b[COLS.recentVisit]);
+        if(!dA) return 1; if(!dB) return -1;
+        return dB - dA;
+      });
+    } else if(currentSort === "firstvisit-desc"){
+      sorted.sort((a,b) => {
+        const dA = parseDate(a[COLS.firstVisit]); const dB = parseDate(b[COLS.firstVisit]);
+        if(!dA) return 1; if(!dB) return -1;
+        return dB - dA;
+      });
+    }
+
+    renderList(sorted);
+  }
+
+  function renderList(list){
+    const ul = document.getElementById('broker-list');
+    ul.innerHTML = "";
+    list.forEach(row => {
+      const originalIndex = brokers.indexOf(row);
+      const li = document.createElement('li');
+      li.className = 'broker-row';
+      li.tabIndex = 0;
+      li.onclick = () => showDetail(originalIndex);
+      li.onkeydown = (e) => { if(e.key === 'Enter') showDetail(originalIndex); };
+
+      const docId = (row[COLS.docId] || "").trim();
+      const name = (row[COLS.broker] || "").trim();
+      const recentVisit = (row[COLS.recentVisit] || "").trim();
+
+      li.innerHTML = `
+        <div class="name"><span class="id-tag">(${docId || "—"})</span>${name}</div>
+        <div class="visited">
+          <span class="label">Last visited</span>
+          <span class="date">${recentVisit || "—"}</span>
+        </div>
+      `;
+      ul.appendChild(li);
+    });
+  }
+
+  function fieldRow(label, value, opts){
+    opts = opts || {};
+    const isEmpty = !value || value.trim() === "";
+    let cls = "v";
+    let display = value;
+    if(isEmpty){ cls += " empty"; display = "Not recorded"; }
+    else if(opts.yesNo){
+      const v = value.trim().toLowerCase();
+      if(v === "yes") cls += " yes";
+      else if(v === "no") cls += " no";
+    }
+    return `<div class="field${opts.full ? ' full' : ''}">
+      <div class="k">${label}</div>
+      <div class="${cls}">${display}</div>
+    </div>`;
+  }
+
+  function renderDetail(row){
+    const name = (row[COLS.broker] || "").trim();
+    const docId = (row[COLS.docId] || "").trim();
+    const notes = (row[COLS.notes] || "").trim();
+
+    const html = `
+      <div class="detail-title">
+        <span class="eyebrow">Doc ${docId || "—"}</span>
+        <h2>${name}</h2>
+      </div>
+      <div class="field-grid">
+        ${fieldRow("Languages", row[COLS.languages])}
+        ${fieldRow("Contacts", row[COLS.contacts])}
+        ${fieldRow("First visit", row[COLS.firstVisit])}
+        ${fieldRow("Most recent visit", row[COLS.recentVisit])}
+        ${fieldRow("Avg flood &amp; water cases / yr", row[COLS.floodCases])}
+        ${fieldRow("% of commercial projects", row[COLS.commercialPct])}
+        ${fieldRow("Competitors", row[COLS.competitors])}
+        ${fieldRow("Brochures", row[COLS.brochures])}
+        ${fieldRow("Insurance carriers", row[COLS.carriers], {full:true})}
+        ${fieldRow("Angus meeting?", row[COLS.angusMeeting], {yesNo:true})}
+        ${fieldRow("Verbal confirmation?", row[COLS.verbalConfirmation], {yesNo:true})}
+      </div>
+      <div class="notes-section">
+        <div class="k">Important notes</div>
+        <div class="notes-box${notes ? '' : ' empty'}">${notes || "No notes recorded for this broker."}</div>
+      </div>
+    `;
+    document.getElementById('detail-content').innerHTML = html;
+  }
+</script>
+</body>
+</html>
